@@ -1,0 +1,86 @@
+version: "3.5"
+name: scala-brawler 
+services:
+  db:
+    image: postgres:latest
+    hostname: db
+    environment:
+      - POSTGRES_PASSWORD=brawler
+      - POSTGRES_USER=brawler
+      - POSTGRES_DB=brawler
+    ports:
+      - "5432:5432"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.9'
+          memory: '1.5GB'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  api01:
+    image: scala-brawl:http4s-jvm-scala_2.13
+    pull_policy: if_not_present
+    hostname: brawl-app-01
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+    ports:
+      - "9999:9991"
+    expose:
+      - "7777"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.568"
+          memory: "1.0GB"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9999/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  api02:
+    image: scala-brawl:http4s-jvm-scala_2.13
+    pull_policy: if_not_present
+    hostname: brawl-app-01
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+    ports:
+      - "9999:9992"
+    expose:
+      - "8888"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.568"
+          memory: "1.0GB"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9999/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api01
+      - api02
+    ports:
+      - "9999:9999"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: '0.2GB'

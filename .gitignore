@@ -2,7 +2,7 @@ target/
 .bloop/
 .metals/
 .vscode/
-
+.idea/
 project/.bloop
 project/target
 project/project

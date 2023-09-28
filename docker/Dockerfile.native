@@ -1,0 +1,23 @@
+FROM findepi/graalvm:java17-all as builder
+RUN gu install native-image
+WORKDIR /app-build
+ARG SCALA_VER=2.13
+ENV SCALA_VER ${SCALA_VER}
+ADD target/scala-$SCALA_VER/app.jar .
+ADD src/main/resources/META-INF/native-image-$SCALA_VER/* .
+RUN native-image \
+  -H:ConfigurationFileDirectories=./ \
+  -H:+PrintClassInitialization \
+  -H:+ReportExceptionStackTraces \
+  --static \
+  --verbose \
+  --link-at-build-time \
+  --report-unsupported-elements-at-runtime \
+  --no-fallback  \
+  -jar app.jar app
+
+# use a smaller image to run the binary
+FROM debian:stable-slim
+WORKDIR /app
+COPY --from=builder /app-build/app .
+ENTRYPOINT ["/app/http-app"]

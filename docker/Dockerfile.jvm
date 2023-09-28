@@ -1,0 +1,5 @@
+FROM eclipse-temurin:17-jre-jammy
+ARG SCALA_VER=2.13
+ENV SCALA_VER ${SCALA_VER}
+ADD target/scala-${SCALA_VER}/app.jar .
+ENTRYPOINT ["java","-jar","/app.jar"]
