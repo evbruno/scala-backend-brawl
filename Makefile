@@ -5,6 +5,8 @@ APP_VER   := $(shell grep "ThisBuild / version := " build.sbt | cut -c 25-27)
 SCALA_VER := 2.13
 APP_IMPL := http4s
 
+.PHONY: docker
+
 build:
 	sbt -java-home ${OPENJDK7} -v +app-http4s/assembly
 

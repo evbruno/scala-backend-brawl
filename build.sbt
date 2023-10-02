@@ -35,7 +35,7 @@ lazy val `app-http4s` = (project in file("app-http4s"))
       // "ch.qos.logback" % "logback-classic" % "1.4.11"
       "org.slf4j" % "slf4j-nop" % "2.0.9"
     ),
-    assembly / mainClass := Some("etc.rinha.app.Http4sApp"),
+    assembly / mainClass := Some("etc.rinha.app.App"),
     //assembly / assemblyJarName := s"${name.value}.jar",
     assembly / assemblyJarName := s"app.jar",
     assembly / assemblyMergeStrategy := {

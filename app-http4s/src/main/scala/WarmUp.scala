@@ -23,7 +23,7 @@ object WarmUp {
       _ <- IO.println("... starting warm up")
       t <- job(svc, bulk).timed
       _ <- health.update(_ => true)
-      _ <- IO.println(s"... server is ready (wup took ${t._1.toMillis} millis)!")
+      _ <- IO.println(s"... server is ready (wup took ${t._1.toMillis} millis)!") // FIXME move
     } yield ()
 
   private def job(svc: PessoaService[IO], bulk: Int = 128) =

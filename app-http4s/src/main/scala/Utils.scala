@@ -16,7 +16,7 @@ object Utils {
     def rec(step: Int): F[A] = {
       f.handleErrorWith {
         case t: Throwable if step < max =>
-          val s = (step << 8).millis
+          val s = (step << 10).millis
           onError(t, s) >> Temporal[F].sleep(s) >> rec(step + 1)
         case t                          =>
           Temporal[F].raiseError[A](t)
