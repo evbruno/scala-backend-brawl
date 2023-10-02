@@ -17,7 +17,7 @@ object DatabaseOps {
         .toList
     }.fold(
       fa => {
-        fa.printStackTrace();
+        fa.printStackTrace()
         Nil
       },
       identity
@@ -67,9 +67,10 @@ object DatabaseOps {
       stmt.executeUpdate()
     }.fold(
       t =>
-        if (t.getMessage.contains("duplicate key value violates unique constraint"))
+        if (t.getMessage.contains("duplicate key value violates unique constraint")) {
+          t.printStackTrace()
           Left(ApelidoEmUso(p))
-        else
+        } else
           Left(t),
       _ => Right(PessoaOut(id, p))
     )
@@ -82,14 +83,9 @@ object DatabaseOps {
       rs.getInt(1)
     }.toOption
 
-  def truncate()(implicit conn: Connection): Unit =
+  def truncate()(implicit conn: Connection): Try[Int] =
     Using(conn.createStatement()) {
       _.executeUpdate(TRUNCATE)
-    }
-
-  def ddl()(implicit conn: Connection): Try[Int] =
-    Using(conn.createStatement()) {
-      _.executeUpdate(DDL)
     }
 
   def deleteApelidoLike(str: String)(implicit conn: Connection): Try[Int] =
@@ -115,19 +111,6 @@ object DatabaseOps {
   private val TRUNCATE = "TRUNCATE TABLE pessoas"
 
   private val DELETE = "DELETE from PESSOAS WHERE apelido like ?"
-
-  private val DDL =
-    """CREATE TABLE IF NOT EXISTS public.PESSOAS (
-      |    ID uuid NOT NULL,
-      |    APELIDO VARCHAR(32) UNIQUE NOT NULL,
-      |    NASCIMENTO VARCHAR(12) NOT NULL,
-      |    NOME VARCHAR(100) NOT NULL,
-      |    STACK VARCHAR(255),
-      |    PRIMARY KEY (ID),
-      |    BUSCA_TRGM TEXT GENERATED ALWAYS AS (
-      |        NOME || ' ' || APELIDO || ' ' || COALESCE(STACK, '')
-      |    ) STORED NOT NULL
-      |);""".stripMargin
 
   // Implicits
 

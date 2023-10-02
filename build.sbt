@@ -1,5 +1,5 @@
 ThisBuild / organization := "br.etc.bruno"
-ThisBuild / version := "0.1-SNAPSHOT"
+ThisBuild / version := "0.1"
 ThisBuild / scalaVersion := scala2x
 
 lazy val scala3x = "3.3.0"
@@ -45,6 +45,14 @@ lazy val `app-http4s` = (project in file("app-http4s"))
         val oldStrategy = (ThisBuild / assemblyMergeStrategy).value
         oldStrategy(x)
     }
+  )
+
+lazy val `app-warmup`= (project in file("app-warmup"))
+  .dependsOn(shared)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.squareup.okhttp3" % "okhttp" % "4.11.0"
+    )
   )
 
 lazy val root = (project in file("."))

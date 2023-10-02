@@ -20,4 +20,4 @@ RUN native-image \
 FROM debian:stable-slim
 WORKDIR /app
 COPY --from=builder /app-build/app .
-ENTRYPOINT ["/app/http-app"]
+ENTRYPOINT ["/app/app"]

@@ -1,49 +1,52 @@
 package etc.rinha.app
 
-import cats.effect.IO
-import cats.effect.unsafe.IORuntime
-import etc.rinha.shared._
-import org.http4s.Method._
-import org.http4s.{ HttpApp, Request, Response, Uri }
-import scala.concurrent.Future
+import cats.effect.{ IO, Ref }
+import etc.rinha.app.service.PessoaService
+import etc.rinha.shared.Payloads
+import java.net.InetAddress.getLocalHost
+import scala.concurrent.duration._
+import cats.syntax.all._
 
+// dumb "testing"
+// should help grraalvm agent to detect "running paths"
+// TODO move to shared so other impls could use the same "tests"
 object WarmUp {
 
-  def service(
-    app: HttpApp[IO],
-    bulkSize: Int = 128
-  )(implicit io: IORuntime): IO[Unit] = {
+  case class WarmUpException(m: String) extends RuntimeException
 
-    def bodyOf(r: Response[IO]) = {
-      val v = r.body.compile.toVector.unsafeRunSync()
-      new String(v.toArray)
-    }
+  def apply(
+   svc: PessoaService[IO],
+   health: Ref[IO, Boolean],
+   bulk: Int = 128
+ ): IO[Unit] =
+    for {
+      _ <- IO.println("... starting warm up")
+      t <- job(svc, bulk).timed
+      _ <- health.update(_ => true)
+      _ <- IO.println(s"... server is ready (wup took ${t._1.toMillis} millis)!")
+    } yield ()
 
-    def getIO(uri: Uri) =
-      app.run(Request(method = GET, uri))
+  private def job(svc: PessoaService[IO], bulk: Int = 128) =
+    for {
+      prefix <- IO.delay(s"fooo_${getLocalHost.getHostName}_")
+      next   <- svc.count.map(_ + 1)
+      id0    <- IO.randomUUID
+      _      <- svc.save(Payloads.randomPessoaIn(prefix + next, Some(id0)))
+      outs   <- svc.findPessoas(prefix)
+      _      <- IO.raiseWhen(outs.isEmpty)(WarmUpException(s"search failed #findPessoas($prefix)"))
+      out0   <- svc.getPessoa(id0)
+      _      <- IO.raiseWhen(out0.isEmpty)(WarmUpException(s"search failed #getPessoa($id0)"))
+      del    <- svc.deleteApelidoLike(prefix)
+      _      <- IO.raiseWhen(del < 1)(WarmUpException(s"delete failed (ret=$del)"))
+      _      <- IO.println(s"bulk insert starting ($bulk entries)") >> IO.sleep(500.millis)
 
-    def postIO(uri: Uri, body: Option[String]) = {
-      val req: Request[IO] = body match {
-        case None => Request(method = POST, uri)
-        case Some(b) => Request(method = POST, uri, body = fs2.Stream.emits(b.getBytes))
-      }
-      app.run(req)
-    }
+      ios    = (1 to bulk).map(i => svc.save(Payloads.randomPessoaIn(prefix + i + "_")))
+      saves  <- ios.toList.parSequence.timed
+      _      <- IO.println(s"bulk insert took ${saves._1.toMillis} ms (${saves._2.count(_.isFailure)} errors)")
+      del    <- svc.deleteApelidoLike(prefix)
+      _      <- IO.raiseWhen(del < 1)(WarmUpException(s"delete failed (ret=$del)"))
 
-    val impl = new WarmUpProtocol {
-      override def get(url: String): Future[(Int, String)] =
-        getIO(Uri.unsafeFromString(url))
-          .map { r => (r.status.code, bodyOf(r)) }
-          .unsafeToFuture()
+    } yield ()
 
-      override def post(url: String, body: Option[String]): Future[(Int, String)] = {
-        postIO(Uri.unsafeFromString(url), body)
-          .map { r => (r.status.code, bodyOf(r)) }
-          .unsafeToFuture()
-      }
-    }
 
-    val f = WarmUpService.run(impl, bulkSize)(io.compute)
-    IO.fromFuture(IO.pure(f))
-  }
 }

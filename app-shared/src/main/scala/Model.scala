@@ -2,7 +2,6 @@ package etc.rinha.shared
 
 import java.util.UUID
 
-
 case class PessoaIn(            // FIXME validar regras
   apelido: String,              // obrigatório, único, string de até 32 caracteres.
   nome: String,                 // obrigatório, string de até 100 caracteres.

@@ -1,16 +1,15 @@
 package etc.rinha.app
 
 import cats.effect._
-import cats.effect.unsafe.IORuntime
 import com.comcast.ip4s._
-import etc.rinha.app.service.{ PessoaService, byPass, inDatabase, inMemory }
+import etc.rinha.Utils.retrier
+import etc.rinha.app.service._
 import etc.rinha.shared.PessoaOut
 import java.util.UUID
-import org.http4s.HttpApp
 import org.http4s.ember.server._
-import org.postgresql.ds.{ PGPoolingDataSource, PGSimpleDataSource }
+import org.postgresql.ds.PGSimpleDataSource
 
-object Http4sApp extends IOApp {
+object App extends IOApp {
 
   override def run(args: List[String]): IO[ExitCode] = {
     val cfg = AppConfig()
@@ -24,9 +23,9 @@ object Http4sApp extends IOApp {
       _      <- IO.println(s"....server starting at $host:$port (health: $initialHeath)")
       health <- IO.ref(initialHeath)
       svc    <- makeService(cfg)
-      app    = AppRoutes.api(health, svc)
+      app    = Routes.api(health, svc)
 
-      _     <- warmup(app, svc, cfg.warmUpBulkSize, health)
+      _     <- WarmUp(svc, health, cfg.warmUpBulkSize)
 
       _     <- EmberServerBuilder
                 .default[IO]
@@ -39,35 +38,21 @@ object Http4sApp extends IOApp {
     } yield ExitCode.Success
   }
 
-  // private
-
-  private def warmup(
-    app: HttpApp[IO],
-    svc: PessoaService[IO],
-    bulk: Int = 128,
-    href: Ref[IO, Boolean]
-  )(implicit io: IORuntime): IO[Unit] =
-    for {
-      _ <- IO.println("... starting warm up")
-      t <- (
-              svc.deleteApelidoLike("fooo_") *>
-              WarmUp.service(app, bulk) *>
-              svc.deleteApelidoLike("fooo_")
-          ).timed
-      _ <- href.update(_ => true)
-      _ <- IO.println(s"... server is ready (wup took ${t._1.toMillis} millis)!")
-    } yield ()
-
   private def makeService(cfg: AppConfig): IO[PessoaService[IO]] =
     if (cfg.impl == MEM)
         IO.println("... Using in memory service...") >>
-        IO.ref(Map[UUID, PessoaOut]()).map(inMemory[IO](_))
+        IO.ref(Map[UUID, PessoaOut]()).map(InMemory[IO](_))
     else if (cfg.impl == PASS)
       IO.println("... Using 'bypass' service...") >>
-      IO.pure(byPass[IO])
+      IO.pure(ByPass[IO])
     else
-      IO.println("... using real service...") >>
-      IO.delay(inDatabase[IO](cfg))
+      for {
+          _ <- IO.println(s"... using real service [${cfg.dbHost}:5432/brawler]")
+          c <- retrier(
+            IO.blocking(cfg.newDatasource).map(_.getConnection),
+            (t, s) => IO.println(s"error getting the connection: ${t.getMessage} (retrying in $s)")
+          )
+      } yield InDatabase[IO](c)
 
   trait ServiceImpl
 
@@ -88,10 +73,12 @@ object Http4sApp extends IOApp {
     impl: ServiceImpl,
     warmUpBulkSize: Int
   ) {
+    // TODO: test w/ hikari
     def newDatasource: javax.sql.DataSource = {
       val ds = new PGSimpleDataSource()
       ds.setUser("brawler")
-      ds.setPassword("brawlerp")
+      ds.setPassword("brawler")
+      ds.setDatabaseName("brawler")
       ds.setPortNumbers(Array(5432))
       ds.setServerNames(Array(dbHost))
       ds
