@@ -11,13 +11,14 @@ import org.postgresql.ds.PGSimpleDataSource
 
 object App extends IOApp {
 
+  // debug starvation 🤔 💭
+  //override protected def blockedThreadDetectionEnabled = true
+
   override def run(args: List[String]): IO[ExitCode] = {
     val cfg = AppConfig()
     val host = ipv4"0.0.0.0"
     val port = Port.fromInt(cfg.appPort).get // let it crash
     val initialHeath = false
-
-    implicit val _io = runtime
 
     for {
       _      <- IO.println(s"....server starting at $host:$port (health: $initialHeath)")

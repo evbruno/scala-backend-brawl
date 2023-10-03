@@ -68,7 +68,7 @@ object DatabaseOps {
     }.fold(
       t =>
         if (t.getMessage.contains("duplicate key value violates unique constraint")) {
-          t.printStackTrace()
+//          t.printStackTrace()
           Left(ApelidoEmUso(p))
         } else
           Left(t),
